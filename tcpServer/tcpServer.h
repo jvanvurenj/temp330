@@ -4,7 +4,7 @@
 #include <QObject>
 #include <QTcpServer>
 #include <QTcpSocket>
-
+#include <QFile>
 #include <stdlib.h>
 #include <iostream>
 #include <queue>
@@ -26,12 +26,14 @@ public:
     bool debug;
     std::queue<QByteArray> messageQueue;
     std::vector<QTcpSocket*> connections;
+    QFile fileQueue;
 
 public slots:
     void readMessage();
     void handleClient();
     void deliverMessage();
     void onDisconnect();
+    void readFile();
 
 signals:
     void newMessage();

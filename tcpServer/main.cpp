@@ -7,7 +7,11 @@
 #include <QThread>
 #include <QWidget>
 #include <QtCore>
+
+#include <QFile>
+
 #include <QMap>
+
 
 
 #include <iostream>
@@ -57,6 +61,7 @@ void tcpServer::handleClient()
 
     // Connect all necessary events to new socket connection
     connect(socket, SIGNAL(readyRead()), this, SLOT(readMessage()));
+
     connect(socket, SIGNAL(disconnected()), this, SLOT(onDisconnect()));
 
     // Write all current clients online to the new client
@@ -79,7 +84,11 @@ void tcpServer::readMessage()
 
     QByteArray buffer;
     QByteArray message;
+
+
+
     quint64 maxSize = Q_INT64_C(32);
+
     while(true)
     {
         buffer = socket->read(maxSize);
@@ -118,6 +127,35 @@ void tcpServer::readMessage()
 }
 
 
+
+    // Check if its a username command
+    if(QString(message).contains("!name ") && QString(message).indexOf("!") == 0)
+    {
+        QString username = QString(message);
+        username.remove(0, 5);
+        socket->setObjectName(username);
+
+        qDebug() << "User has set name to: " << username;
+    }
+    else if((QString(message).contains("!file") && QString(message).indexOf("!") == 0))
+    {
+        readFile();
+
+    }
+    else
+    {
+        QByteArray userAndMessage;
+        userAndMessage.append(socket->objectName());
+        userAndMessage.append(QString(": "));
+        userAndMessage.append(message);
+
+        // Send to message queue to enable sending to all clients
+        this->messageQueue.push(userAndMessage);
+
+        // Emit event signal for server
+        emit newMessage();
+    }
+
 bool tcpServer::isUserName(QString message)
 {
     int index = message.indexOf("!");
@@ -127,6 +165,7 @@ bool tcpServer::isUserName(QString message)
     }
 
     return true;
+
 }
 
 
@@ -184,6 +223,47 @@ void tcpServer::onDisconnect()
         }
     }
 }
+
+void tcpServer::readFile()
+{
+    // Reads file from socket that emitted sendFile signal. Appends the
+    // message to server instance's file queue
+    this->fileQueue.open(QFile::WriteOnly|QFile::Truncate);
+    this->fileQueue.close();
+    QByteArray fIn;
+    QByteArray buffer;
+    QTcpSocket* socket = qobject_cast<QTcpSocket*>(QObject::sender());
+    quint64 maxSize = Q_INT64_C(16);
+
+    // Read message through buffer
+    while(true)
+    {
+        buffer = socket->read(maxSize);
+        if(buffer.isEmpty())
+        {
+            break;
+        }
+
+        fIn.append(buffer);
+    }
+
+    this->fileQueue.setFileName("C:/Users/jvanv/example.png");
+
+    if(!this->fileQueue.open(QIODevice::WriteOnly | QIODevice::Append)){
+        qDebug() << "File not accessible";
+        return;
+        }
+    else{
+        this->fileQueue.write(fIn);
+
+        this->fileQueue.close();
+        qDebug() << "File sent!";
+            //sent
+        }
+
+}
+
+
 
 
 void tcpServer::updateUserList(QString socketName)
